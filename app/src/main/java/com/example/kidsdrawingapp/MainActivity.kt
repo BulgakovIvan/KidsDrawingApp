@@ -19,7 +19,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.get
 import com.example.kidsdrawingapp.databinding.ActivityMainBinding
 import com.example.kidsdrawingapp.databinding.DialogBrushSizeBinding
-import java.lang.Exception
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.Exception
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -55,6 +58,15 @@ class MainActivity : AppCompatActivity() {
         binding.ibUndo.setOnClickListener {
             binding.drawingView.onClickUndo()
         }
+
+        binding.ibSave.setOnClickListener {
+            if (isReadStorageAllowed()) {
+                BitmapAsyncTask(getBitmapFromView(binding.flDrawingViewContainer))
+            } else {
+                requestStoragePermission()
+            }
+        }
+
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -166,6 +178,35 @@ class MainActivity : AppCompatActivity() {
         view.draw(canvas)
 
         return returnedBitmap
+    }
+
+    private fun BitmapAsyncTask(mBitmap: Bitmap) {
+        var result = ""
+
+        if (mBitmap != null) {
+            try {
+                val bytes = ByteArrayOutputStream()
+                mBitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
+                val f = File(externalCacheDir!!.absoluteFile.toString()
+                             + File.separator + "KidDrawingApp_"
+                             + System.currentTimeMillis() / 1000 + ".png")
+
+                val fos = FileOutputStream(f)
+                fos.write(bytes.toByteArray())
+                fos.close()
+                result = f.absolutePath
+            } catch (e: Exception) {
+                result = ""
+                e.printStackTrace()
+            }
+        }
+
+        if (!result.isEmpty()) {
+            Toast.makeText(this, "File saved successfully :$result", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Something went wrong while saving the file.", Toast.LENGTH_SHORT).show()
+        }
+
     }
 
     companion object {
