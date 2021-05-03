@@ -40,15 +40,17 @@ class MainActivity : AppCompatActivity() {
 
         binding.ibGallery.setOnClickListener {
             if (isReadStorageAllowed()) {
-
                 val pickPhotoIntent = Intent(Intent.ACTION_PICK,
                                             MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-
                 startActivityForResult(pickPhotoIntent, GALLERY)
 
             } else {
                 requestStoragePermission()
             }
+        }
+
+        binding.ibUndo.setOnClickListener {
+            binding.drawingView.onClickUndo()
         }
     }
 
