@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.get
 import com.example.kidsdrawingapp.databinding.ActivityMainBinding
 import com.example.kidsdrawingapp.databinding.DialogBrushSizeBinding
+import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -27,6 +28,8 @@ import kotlin.Exception
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var mImageButtonCurrentPaint: ImageButton? = null
+
+    private val myCoroutineScope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,12 +64,13 @@ class MainActivity : AppCompatActivity() {
 
         binding.ibSave.setOnClickListener {
             if (isReadStorageAllowed()) {
-                BitmapAsyncTask(getBitmapFromView(binding.flDrawingViewContainer))
+                myCoroutineScope.launch {
+                    bitmapAsyncTask(getBitmapFromView(binding.flDrawingViewContainer))
+                }
             } else {
                 requestStoragePermission()
             }
         }
-
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -180,33 +184,36 @@ class MainActivity : AppCompatActivity() {
         return returnedBitmap
     }
 
-    private fun BitmapAsyncTask(mBitmap: Bitmap) {
-        var result = ""
+    private suspend fun bitmapAsyncTask(mBitmap: Bitmap) {
+        var result = withContext(Dispatchers.IO) {
+            var result = ""
 
-        if (mBitmap != null) {
-            try {
-                val bytes = ByteArrayOutputStream()
-                mBitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
-                val f = File(externalCacheDir!!.absoluteFile.toString()
-                             + File.separator + "KidDrawingApp_"
-                             + System.currentTimeMillis() / 1000 + ".png")
+            if (mBitmap != null) {
+                try {
+                    val bytes = ByteArrayOutputStream()
+                    mBitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
+                    val f = File(externalCacheDir!!.absoluteFile.toString()
+                                 + File.separator + "KidDrawingApp_"
+                                 + System.currentTimeMillis() / 1000 + ".png")
 
-                val fos = FileOutputStream(f)
-                fos.write(bytes.toByteArray())
-                fos.close()
-                result = f.absolutePath
-            } catch (e: Exception) {
-                result = ""
-                e.printStackTrace()
+                    val fos = FileOutputStream(f)
+                    fos.write(bytes.toByteArray())
+                    fos.close()
+                    result = f.absolutePath
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            return@withContext result
+        }
+        withContext(Dispatchers.Main) {
+            if (result.isNotEmpty()) {
+                Toast.makeText(this@MainActivity, "File saved successfully :$result", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Something went wrong while saving the file.", Toast.LENGTH_LONG).show()
             }
         }
-
-        if (!result.isEmpty()) {
-            Toast.makeText(this, "File saved successfully :$result", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Something went wrong while saving the file.", Toast.LENGTH_SHORT).show()
-        }
-
     }
 
     companion object {
