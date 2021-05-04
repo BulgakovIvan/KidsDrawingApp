@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private var mImageButtonCurrentPaint: ImageButton? = null
 
     private val myCoroutineScope = CoroutineScope(Dispatchers.Main)
+    private lateinit var mProgressDialog: Dialog
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +66,9 @@ class MainActivity : AppCompatActivity() {
         binding.ibSave.setOnClickListener {
             if (isReadStorageAllowed()) {
                 myCoroutineScope.launch {
+                    showProgressDialog()
                     bitmapAsyncTask(getBitmapFromView(binding.flDrawingViewContainer))
+                    cancelProgressDialog()
                 }
             } else {
                 requestStoragePermission()
@@ -214,6 +217,16 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Something went wrong while saving the file.", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun showProgressDialog() {
+        mProgressDialog = Dialog(this@MainActivity)
+        mProgressDialog.setContentView(R.layout.dialog_custom_progress)
+        mProgressDialog.show()
+    }
+
+    private fun cancelProgressDialog() {
+        mProgressDialog.dismiss()
     }
 
     companion object {
