@@ -8,14 +8,16 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.widget.ImageButton
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider.getUriForFile
 import androidx.core.view.get
 import com.example.kidsdrawingapp.databinding.ActivityMainBinding
 import com.example.kidsdrawingapp.databinding.DialogBrushSizeBinding
@@ -23,7 +25,7 @@ import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.Exception
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -31,6 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     private val myCoroutineScope = CoroutineScope(Dispatchers.Main)
     private lateinit var mProgressDialog: Dialog
+    private val TAG = "ups"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         binding.ibGallery.setOnClickListener {
             if (isReadStorageAllowed()) {
                 val pickPhotoIntent = Intent(Intent.ACTION_PICK,
-                                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
                 startActivityForResult(pickPhotoIntent, GALLERY)
 
             } else {
@@ -64,11 +67,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.ibSave.setOnClickListener {
-            if (isReadStorageAllowed()) {
+            if (isWriteStorageAllowed()) {
                 myCoroutineScope.launch {
-                    showProgressDialog()
-                    bitmapAsyncTask(getBitmapFromView(binding.flDrawingViewContainer))
-                    cancelProgressDialog()
+                    bitmapAsyncShareImage(getBitmapFromView(binding.flDrawingViewContainer))
                 }
             } else {
                 requestStoragePermission()
@@ -86,7 +87,7 @@ class MainActivity : AppCompatActivity() {
                         binding.ivBackground.setImageURI(data.data)
                     } else {
                         Toast.makeText(this@MainActivity, "Error in parsing the image of its corrupted.",
-                                       Toast.LENGTH_SHORT).show()
+                                Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -168,7 +169,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun isReadStorageAllowed(): Boolean {
         val result = ContextCompat.checkSelfPermission(this,
-                        Manifest.permission.READ_EXTERNAL_STORAGE)
+                Manifest.permission.READ_EXTERNAL_STORAGE)
+        return result == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun isWriteStorageAllowed(): Boolean {
+        val result = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)
         return result == PackageManager.PERMISSION_GRANTED
     }
 
@@ -187,35 +194,57 @@ class MainActivity : AppCompatActivity() {
         return returnedBitmap
     }
 
-    private suspend fun bitmapAsyncTask(mBitmap: Bitmap) {
-        var result = withContext(Dispatchers.IO) {
-            var result = ""
+    private suspend fun bitmapAsyncShareImage(mBitmap: Bitmap) {
+        showProgressDialog()
+
+        var resultFile = withContext(Dispatchers.IO) {
+            var fileName = "KidDrawingApp_" + System.currentTimeMillis() / 1000 + ".png"
+            val f = File(externalCacheDir!!.absoluteFile.toString()
+                         + File.separator + fileName)
 
             if (mBitmap != null) {
                 try {
                     val bytes = ByteArrayOutputStream()
                     mBitmap.compress(Bitmap.CompressFormat.PNG, 90, bytes)
-                    val f = File(externalCacheDir!!.absoluteFile.toString()
-                                 + File.separator + "KidDrawingApp_"
-                                 + System.currentTimeMillis() / 1000 + ".png")
-
                     val fos = FileOutputStream(f)
                     fos.write(bytes.toByteArray())
                     fos.close()
-                    result = f.absolutePath
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
             }
 
-            return@withContext result
+            Log.i(TAG, "image save to: ${f.absolutePath}")
+//            delay(5000)
+//            Log.i(TAG, "afterDelay")
+
+            return@withContext f
         }
-        withContext(Dispatchers.Main) {
-            if (result.isNotEmpty()) {
-                Toast.makeText(this@MainActivity, "File saved successfully :$result", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this@MainActivity, "Something went wrong while saving the file.", Toast.LENGTH_LONG).show()
+
+        cancelProgressDialog()
+
+        if (resultFile.exists()) {
+            Toast.makeText(this@MainActivity, "File saved successfully :$resultFile", Toast.LENGTH_SHORT).show()
+
+            val contentUri = getUriForFile(this@MainActivity, "com.example.kidsdrawingapp.fileprovider", resultFile)
+
+            Log.i(TAG, "image uri: $contentUri")
+
+            val shareIntent: Intent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                type = "image/png"
             }
+
+//            Using the Android Sharesheet
+            startActivity(Intent.createChooser(shareIntent, null))
+
+//            Using the Android intent resolver
+//            startActivity(shareIntent)
+
+        } else {
+            Toast.makeText(this@MainActivity, "Something went wrong while saving the file.",
+                    Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -223,10 +252,12 @@ class MainActivity : AppCompatActivity() {
         mProgressDialog = Dialog(this@MainActivity)
         mProgressDialog.setContentView(R.layout.dialog_custom_progress)
         mProgressDialog.show()
+//        Log.i(TAG, "showDialog")
     }
 
     private fun cancelProgressDialog() {
         mProgressDialog.dismiss()
+//        Log.i(TAG, "closeDialog")
     }
 
     companion object {

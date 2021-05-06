@@ -22,14 +22,13 @@
         </activity>
         
         <provider
-            android:authorities="com.example.kidsdrawingapp.fileprovider"
             android:name="androidx.core.content.FileProvider"
-            android:exported="false"
-            android:grantUriPermissions="true">
+            android:authorities="com.example.kidsdrawingapp.fileprovider"
+            android:grantUriPermissions="true"
+            android:exported="false">
                 <meta-data
                     android:name="android.support.FILE_PROVIDER_PATHS"
                     android:resource="@xml/path"/>
-
         </provider>
         
     </application>
